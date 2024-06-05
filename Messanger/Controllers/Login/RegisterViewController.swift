@@ -147,6 +147,7 @@ class RegisterViewController: UIViewController, UINavigationControllerDelegate {
                                  height: size)
         
         imageView.layer.cornerRadius = imageView.width/2
+        imageView.clipsToBounds = true
         
         firstNameField.frame = CGRect(x: 30,
                                   y: imageView.bottom+10,
@@ -212,10 +213,29 @@ class RegisterViewController: UIViewController, UINavigationControllerDelegate {
                     strongSelf.alertUserRegisterError()
                     return
                 }
-                
-                DatabaseManager.shared.insertUser(with: ChatAppUser(firstName: firstName,
-                                                                    lastName: lastName,
-                                                                    emailAddress: email))
+                let chatUser = ChatAppUser(firstName: firstName,
+                                           lastName: lastName,
+                                           emailAddress: email)
+                DatabaseManager.shared.insertUser(with:chatUser) { done in
+                    if done {
+                        /// upload image
+                        guard let image = strongSelf.imageView.image, let data = image.pngData() else {
+                            return
+                            
+                        }
+
+                        let fileName = chatUser.profilePictureFileName
+                        StorageManager.shared.uploadProfilePicure(with: data, fileName: fileName) { result in
+                            switch result{
+                                case .success(let donwloadUrl):
+                                    UserDefaults.standard.set(donwloadUrl, forKey: "profile_picture_url")
+                                    print("download url \(donwloadUrl)")
+                                case .failure(let error):
+                                    print("storage error:\(error)")
+                            }
+                        }
+                    }
+                }
                 
                 strongSelf.navigationController?.dismiss(animated: true)
 
@@ -267,10 +287,10 @@ extension RegisterViewController: UIImagePickerControllerDelegate {
                                             preferredStyle: .actionSheet)
         
         actionSheet.addAction(UIAlertAction(title: "cancel", style: .cancel))
-        actionSheet.addAction(UIAlertAction(title: "take photo", style: .cancel,handler: {[weak self] _ in
+        actionSheet.addAction(UIAlertAction(title: "take photo", style: .default,handler: {[weak self] _ in
             self?.presentCamera()
         }))
-        actionSheet.addAction(UIAlertAction(title: "choose photo", style: .cancel,handler: {[weak self] _ in
+        actionSheet.addAction(UIAlertAction(title: "choose photo", style: .default,handler: {[weak self] _ in
             self?.presentPhotoPicker()
         }))
 
