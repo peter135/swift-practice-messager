@@ -7,9 +7,12 @@
 
 import UIKit
 import FirebaseAuth
+import JGProgressHUD
 
-class RegisterViewController: UIViewController {
+class RegisterViewController: UIViewController, UINavigationControllerDelegate {
     
+    private let spinner = JGProgressHUD(style: .dark)
+
     private let scrollView:UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.clipsToBounds = true
@@ -24,7 +27,7 @@ class RegisterViewController: UIViewController {
         field.layer.cornerRadius = 12
         field.layer.borderWidth = 1
         field.layer.borderColor = UIColor.lightGray.cgColor
-        field.placeholder = "email address ..."
+        field.placeholder = "first name ..."
         field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 5, height: 0))
         field.leftViewMode = .always
         field.backgroundColor = .white
@@ -39,7 +42,7 @@ class RegisterViewController: UIViewController {
         field.layer.cornerRadius = 12
         field.layer.borderWidth = 1
         field.layer.borderColor = UIColor.lightGray.cgColor
-        field.placeholder = "email address ..."
+        field.placeholder = "last name ..."
         field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 5, height: 0))
         field.leftViewMode = .always
         field.backgroundColor = .white
@@ -82,6 +85,8 @@ class RegisterViewController: UIViewController {
         imageView.image = UIImage(systemName: "person")
         imageView.tintColor = .gray
         imageView.contentMode = .scaleAspectFit
+        imageView.layer.borderWidth = 2
+        imageView.layer.borderColor = UIColor.lightGray.cgColor
         return imageView
     }()
     
@@ -141,6 +146,8 @@ class RegisterViewController: UIViewController {
                                  width: size,
                                  height: size)
         
+        imageView.layer.cornerRadius = imageView.width/2
+        
         firstNameField.frame = CGRect(x: 30,
                                   y: imageView.bottom+10,
                                   width: scrollView.width-60,
@@ -169,7 +176,7 @@ class RegisterViewController: UIViewController {
     }
     
     @objc private func didTapChangeProfilePic(){
-        
+        presentPhotoActionSheet()
     }
     
     @objc private func registerButtonTapped() {
@@ -186,11 +193,17 @@ class RegisterViewController: UIViewController {
             return
         }
         
+        spinner.show(in: view)
+
         DatabaseManager.shared.userExists(with: email) {[weak self] exists in
             guard let strongSelf = self else {return}
             guard !exists else {
                 strongSelf.alertUserRegisterError(message: "user already exists")
                 return
+            }
+            
+            DispatchQueue.main.async {
+                strongSelf.spinner.dismiss()
             }
             
             //firebase register
@@ -244,5 +257,50 @@ extension RegisterViewController: UITextFieldDelegate {
         return true
     }
     
+}
+
+extension RegisterViewController: UIImagePickerControllerDelegate {
     
+    func presentPhotoActionSheet() {
+        let actionSheet = UIAlertController(title: "profile pciture",
+                                            message: "would you like pick a pci",
+                                            preferredStyle: .actionSheet)
+        
+        actionSheet.addAction(UIAlertAction(title: "cancel", style: .cancel))
+        actionSheet.addAction(UIAlertAction(title: "take photo", style: .cancel,handler: {[weak self] _ in
+            self?.presentCamera()
+        }))
+        actionSheet.addAction(UIAlertAction(title: "choose photo", style: .cancel,handler: {[weak self] _ in
+            self?.presentPhotoPicker()
+        }))
+
+        present(actionSheet, animated: true)
+    }
+    
+    func presentCamera() {
+        let vc = UIImagePickerController()
+        vc.sourceType = .camera
+        vc.delegate = self
+        vc.allowsEditing = true
+        present(vc, animated: true)
+    }
+    
+    func presentPhotoPicker() {
+        let vc = UIImagePickerController()
+        vc.sourceType = .photoLibrary
+        vc.delegate = self
+        vc.allowsEditing = true
+        present(vc, animated: true)
+    }
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true)
+        guard let selectedImage = info[UIImagePickerController.InfoKey.editedImage] as? UIImage else {return}
+        self.imageView.image = selectedImage
+        
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true)
+    }
 }
