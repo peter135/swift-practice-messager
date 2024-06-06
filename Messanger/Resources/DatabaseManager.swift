@@ -125,7 +125,7 @@ extension DatabaseManager {
         
         let safeEmail = DatabaseManager.safeEmail(emailAddress: currentEmail)
         let ref = database.child("\(safeEmail)")
-        ref.observeSingleEvent(of: .value) { snapshot in
+        ref.observeSingleEvent(of: .value) {[weak self] snapshot in
             guard var userNode = snapshot.value as? [String:Any] else {
                 completion(false)
                 return
@@ -172,7 +172,33 @@ extension DatabaseManager {
                 ]
             ]
             
+            let recipient_newConversationData:[String:Any] = [
+                "id":conversationID,
+                "name":"Self",
+                "other_user_email":safeEmail,
+                "latest_message":[
+                    "date":dateString,
+                    "message":message,
+                    "is_read":false
+                ]
+            ]
             
+            // update recipient converstaion
+            self?.database.child("\(otherEmail)/conversations").observeSingleEvent(of: .value, with: {[weak self]snapshot in
+                
+                if var conversations = snapshot.value as? [[String:Any]] {
+                    conversations.append(recipient_newConversationData)
+                    self?.database.child("\(otherEmail)/conversations").setValue(conversations)
+                    
+                }else {
+                    self?.database.child("\(otherEmail)/conversations").setValue([recipient_newConversationData])
+                }
+                
+            })
+            
+            
+            
+            // update current user conversation
             if var conversations = userNode["conversations"] as? [[String:Any]] {
                 conversations.append(newConversationData)
                 userNode["conversations"] = conversations
@@ -317,7 +343,39 @@ extension DatabaseManager {
     }
     
     /// gets all messsages from a given converstaion
-    public func getAllMessagesForConverstaion(with id:String,completion:@escaping (Result<String,Error>) -> Void){
+    public func getAllMessagesForConverstaion(with id:String,completion:@escaping (Result<[Message],Error>) -> Void){
+        database.child("\(id)/messages").observe(.value) { snapshot in
+            guard let value = snapshot.value as? [[String:Any]] else {
+                completion(.failure(DatabaseError.failedToFetch))
+                return
+            }
+            
+            let messages:[Message] = value.compactMap({ dictionary in
+                guard let name = dictionary["name"] as? String,
+                      let isRead = dictionary["is_read"] as? Bool,
+                      let messageID = dictionary["id"] as? String,
+                      let content = dictionary["content"] as? String,
+                      let senderEmail = dictionary["sender_email"] as? String,
+                      let type = dictionary["type"] as? String,
+                      let dateString = dictionary["date"] as? String,
+                      let date = ChatViewController.dateformatter.date(from:dateString) else {
+                    return nil
+                }
+                
+                let sender = Sender(photoURL: "",
+                                    senderId: senderEmail,
+                                    displayName: name)
+                
+                return Message(sender: sender,
+                               messageId: messageID,
+                               sentDate: date,
+                               kind: .text(content))
+                
+            })
+    
+            completion(.success(messages))
+            
+        }
         
     }
     
