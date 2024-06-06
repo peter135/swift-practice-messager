@@ -70,8 +70,7 @@ class ChatViewController: MessagesViewController {
         formatter.locale = .current
         return formatter
     }()
-    private let convsersationId:String?
-    public var isNewConversation = true
+    private var convsersationId:String?
     public var otherUserEmail:String
 
     private var messages = [Message]()
@@ -120,7 +119,7 @@ class ChatViewController: MessagesViewController {
                     DispatchQueue.main.async {
                         self?.messagesCollectionView.reloadDataAndKeepOffset()
                         if shouldScrollToBottom {
-                            self?.messagesCollectionView.scrollToBottom()
+                            self?.messagesCollectionView.scrollToLastItem()
                         }
                     }
                 
@@ -148,19 +147,22 @@ extension ChatViewController:InputBarAccessoryViewDelegate {
             return
         }
         
+        
+        let message  = Message(sender: selfSender,
+                               messageId: messageId,
+                               sentDate: Date(),
+                               kind: .text(text))
         /// send message
         
-        if isNewConversation {
+        if convsersationId == nil {
             
-            let message  = Message(sender: selfSender,
-                                   messageId: messageId,
-                                   sentDate: Date(),
-                                   kind: .text(text))
             DatabaseManager.shared.createNewConversation(with: otherUserEmail,
                                                          name: self.title ?? "user",
-                                                         firstMessage: message) { success in
+                                                         firstMessage: message) {[weak self] success,convId in
                 if success {
-                    print("success")
+                    guard let convId = convId else { return }
+                    self?.convsersationId = convId
+                    print("success \(convId)")
                 }else {
                     print("fail")
 
@@ -169,6 +171,18 @@ extension ChatViewController:InputBarAccessoryViewDelegate {
             
         } else {
             
+            guard let convsersationId = convsersationId, let name = self.title else {
+                return
+            }
+
+            DatabaseManager.shared.sendMessage(to: convsersationId, name: name,newMessage: message) { success in
+                if success {
+                    print("success sent")
+
+                }else {
+                    print("fail to sent")
+                }
+            }
         }
     }
     

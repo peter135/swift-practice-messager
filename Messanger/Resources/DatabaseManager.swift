@@ -22,6 +22,23 @@ final class DatabaseManager {
     }
 }
 
+extension DatabaseManager {
+    
+    public func getDataFor(path:String, completion:@escaping (Result<Any,Error>) -> Void) {
+        self.database.child("\(path)").observeSingleEvent(of: .value) { snapshot in
+            guard let value = snapshot.value else {
+                completion(.failure(DatabaseError.failedToFetch))
+                return
+            }
+            
+            completion(.success(value))
+            
+        }
+    }
+    
+}
+
+
 //MARK: - account management
 
 extension DatabaseManager {
@@ -116,18 +133,22 @@ extension DatabaseManager {
     public func createNewConversation(with otherEmail:String,
                                       name:String,
                                       firstMessage:Message,
-                                      completion:@escaping (Bool) -> Void) {
+                                      completion:@escaping (Bool,String?) -> Void) {
         
-        guard let currentEmail = UserDefaults.standard.value(forKey: "email") as? String else {
+        guard let currentEmail = UserDefaults.standard.value(forKey: "email") as? String,
+              let currentName = UserDefaults.standard.value(forKey: "name") as? String
+        else {
             
             return
         }
+        
+        
         
         let safeEmail = DatabaseManager.safeEmail(emailAddress: currentEmail)
         let ref = database.child("\(safeEmail)")
         ref.observeSingleEvent(of: .value) {[weak self] snapshot in
             guard var userNode = snapshot.value as? [String:Any] else {
-                completion(false)
+                completion(false,nil)
                 return
             }
             
@@ -174,7 +195,7 @@ extension DatabaseManager {
             
             let recipient_newConversationData:[String:Any] = [
                 "id":conversationID,
-                "name":"Self",
+                "name":currentName,
                 "other_user_email":safeEmail,
                 "latest_message":[
                     "date":dateString,
@@ -204,7 +225,7 @@ extension DatabaseManager {
                 userNode["conversations"] = conversations
                 ref.setValue(userNode) {[weak self] error, _ in
                     guard error == nil else {
-                        completion(false)
+                        completion(false,nil)
                         return
                     }
                     self?.finishCreatingConverstaion(name:name,
@@ -221,7 +242,7 @@ extension DatabaseManager {
                 
                 ref.setValue(userNode) {[weak self] error, _ in
                     guard error == nil else {
-                        completion(false)
+                        completion(false,nil)
                         return
                     }
                     self?.finishCreatingConverstaion(name:name,
@@ -241,7 +262,7 @@ extension DatabaseManager {
     private func finishCreatingConverstaion(name:String,
                                             conversationID:String,
                                             firstMessage:Message,
-                                            compeltion:@escaping (Bool) -> Void) {
+                                            compeltion:@escaping (Bool,String?) -> Void) {
         
         var message = ""
         switch firstMessage.kind {
@@ -272,7 +293,7 @@ extension DatabaseManager {
         let dateString = ChatViewController.dateformatter.string(from: messageDate)
         
         guard let myEmail = UserDefaults.standard.value(forKey: "email") as? String else {
-            compeltion(false)
+            compeltion(false,nil)
             return
         }
         
@@ -296,11 +317,11 @@ extension DatabaseManager {
         
         database.child("\(conversationID)").setValue(value) { error, _ in
             guard error == nil else {
-                compeltion(false)
+                compeltion(false,nil)
                 return
             }
             
-            compeltion(true)
+            compeltion(true,conversationID)
         }
         
     }
@@ -380,7 +401,74 @@ extension DatabaseManager {
     }
     
     /// sends a message with taget
-    public func sendMessage(to converstaion:String,message:Message,completion:@escaping (Bool) -> Void){
+    public func sendMessage(to converstaion:String,name:String,newMessage:Message,completion:@escaping (Bool) -> Void){
+        //1.add new message to meessages
+        //2.update sender latest message
+        //3.update recipient latest message
+        self.database.child("\(converstaion)/messages").observeSingleEvent(of: .value) {[weak self] snapshot in
+            guard let strongSelf = self else {return}
+            guard var currentMessages = snapshot.value as? [[String:Any]] else {
+                completion(false)
+                return
+            }
+            
+            let messageDate = newMessage.sentDate
+            let dateString = ChatViewController.dateformatter.string(from: messageDate)
+            
+            
+            var message = ""
+            switch newMessage.kind {
+               case .text(let messageText):
+                   message = messageText
+                   break
+               case .attributedText(_):
+                   break
+               case .photo(_):
+                   break
+               case .video(_):
+                   break
+               case .location(_):
+                   break
+               case .emoji(_):
+                   break
+               case .audio(_):
+                   break
+               case .contact(_):
+                   break
+               case .linkPreview(_):
+                   break
+               case .custom(_):
+                   break
+            }
+            
+            guard let myEmail = UserDefaults.standard.value(forKey: "email") as? String else {
+                completion(false)
+                return
+            }
+            
+            let currentUserEmail = DatabaseManager.safeEmail(emailAddress: myEmail)
+            
+            let newMessageEntry:[String:Any] = [
+                "id":newMessage.messageId,
+                "type":newMessage.kind.messageKindString,
+                "content":message,
+                "date":dateString,
+                "sender_email":currentUserEmail,
+                "is_read":false,
+                "name":name
+            ]
+            
+            currentMessages.append(newMessageEntry)
+            strongSelf.database.child("\(converstaion)/messages").setValue(currentMessages) { error, _ in
+                guard error == nil else {
+                    completion(false)
+                    return
+                }
+                completion(true)
+            }
+            
+        }
+        
         
     }
     

@@ -96,7 +96,6 @@ class ConverstaionsViewController: UIViewController {
         }
         
         let vc = ChatViewController(with: email,id: nil)
-        vc.isNewConversation = true
         vc.title = name
         vc.navigationItem.largeTitleDisplayMode = .never
         navigationController?.pushViewController(vc, animated: true)
