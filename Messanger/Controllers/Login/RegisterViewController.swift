@@ -218,6 +218,9 @@ class RegisterViewController: UIViewController, UINavigationControllerDelegate {
                                            emailAddress: email)
                 DatabaseManager.shared.insertUser(with:chatUser) { done in
                     if done {
+                        
+                        UserDefaults.standard.set(email, forKey: "email")
+
                         /// upload image
                         guard let image = strongSelf.imageView.image, let data = image.pngData() else {
                             return

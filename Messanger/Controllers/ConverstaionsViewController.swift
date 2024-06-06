@@ -13,6 +13,8 @@ class ConverstaionsViewController: UIViewController {
 
     private let spinner = JGProgressHUD(style: .dark)
     
+    
+    
     private let tableView: UITableView = {
         let table = UITableView()
         table.isHidden = true
@@ -41,8 +43,26 @@ class ConverstaionsViewController: UIViewController {
     
     @objc func didTapComposeButton() {
         let vc = NewConverstaionViewController()
+        vc.completion = {[weak self] result in
+            self?.createNewConverstaion(result: result)
+        }
+        
         let navVC = UINavigationController(rootViewController: vc)
         present(navVC, animated: true)
+    }
+    
+    private func createNewConverstaion(result:[String:String]) {
+        guard let name = result["name"],
+              let email = result["email"] else {
+            return
+        }
+        
+        let vc = ChatViewController(with: email)
+        vc.isNewConversation = true
+        vc.title = name
+        vc.navigationItem.largeTitleDisplayMode = .never
+        navigationController?.pushViewController(vc, animated: true)
+        
     }
     
     override func viewDidLayoutSubviews() {
@@ -97,7 +117,7 @@ extension ConverstaionsViewController: UITableViewDelegate, UITableViewDataSourc
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
-        let vc = ChatViewController()
+        let vc = ChatViewController(with: "test@gmail.com")
         vc.title = "jenny smith"
         vc.navigationItem.largeTitleDisplayMode = .never
         navigationController?.pushViewController(vc, animated: true)
