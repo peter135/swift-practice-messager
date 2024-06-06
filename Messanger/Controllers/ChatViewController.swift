@@ -91,9 +91,7 @@ class ChatViewController: MessagesViewController {
         self.convsersationId = id
         self.otherUserEmail = email
         super.init(nibName: nil, bundle: nil)
-        if let convsersationId = convsersationId {
-            listenForMessages(id:convsersationId)
-        }
+       
     }
     
     required init?(coder: NSCoder) {
@@ -111,7 +109,7 @@ class ChatViewController: MessagesViewController {
         messageInputBar.delegate = self
     }
     
-    private func listenForMessages(id:String) {
+    private func listenForMessages(id:String,shouldScrollToBottom:Bool) {
         DatabaseManager.shared.getAllMessagesForConverstaion(with: id) {[weak self] result in
             switch result {
                 case .success(let messages):
@@ -121,6 +119,9 @@ class ChatViewController: MessagesViewController {
                     self?.messages = messages
                     DispatchQueue.main.async {
                         self?.messagesCollectionView.reloadDataAndKeepOffset()
+                        if shouldScrollToBottom {
+                            self?.messagesCollectionView.scrollToBottom()
+                        }
                     }
                 
                 case .failure(let error):
@@ -132,6 +133,9 @@ class ChatViewController: MessagesViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         messageInputBar.inputTextView.becomeFirstResponder()
+        if let convsersationId = convsersationId {
+            listenForMessages(id:convsersationId,shouldScrollToBottom:true)
+        }
     }
 
 }
