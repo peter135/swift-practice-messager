@@ -10,10 +10,48 @@ import MessageKit
 import InputBarAccessoryView
 
 struct Message:MessageType {
-  public var sender: MessageKit.SenderType
+  public var sender: SenderType
   public var messageId: String
   public var sentDate: Date
-  public var kind: MessageKit.MessageKind
+  public var kind: MessageKind
+}
+
+extension MessageKind {
+    var messageKindString:String {
+        switch self {
+            
+        case .text(_):
+            return "text"
+            
+        case .attributedText(_):
+            return "attributedText"
+            
+        case .photo(_):
+            return "photo"
+
+        case .video(_):
+            return "video"
+
+        case .location(_):
+            return "location"
+
+        case .emoji(_):
+            return "emoji"
+
+        case .audio(_):
+            return "audio"
+
+        case .contact(_):
+            return "contact"
+
+        case .linkPreview(_):
+            return "linkPreview"
+
+        case .custom(_):
+            return "custom"
+
+        }
+    }
 }
 
 struct Sender:SenderType {
@@ -107,11 +145,14 @@ extension ChatViewController:InputBarAccessoryViewDelegate {
     private func createMessageId() -> String? {
         // date, otheruser email, sender email
         
-        guard let currentUserEmail = UserDefaults.standard.value(forKey: "email") else {
+        guard let currentUserEmail = UserDefaults.standard.value(forKey: "email") as? String else {
               return nil
         }
+        
+        let safeCurrentEmail = DatabaseManager.safeEmail(emailAddress: currentUserEmail)
+        
         let dateString = Self.dateformatter.string(from:Date())
-        let newIdentifier = "\(otherUserEmail)_\(currentUserEmail)_\(dateString)"
+        let newIdentifier = "\(otherUserEmail)_\(safeCurrentEmail)_\(dateString)"
         print("created messageid:\(newIdentifier)")
         return newIdentifier
     }

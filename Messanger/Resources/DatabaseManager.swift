@@ -159,8 +159,9 @@ extension DatabaseManager {
                    break
             }
             
+            let conversationID = "conversation_\(firstMessage.messageId)"
             let newConversationData:[String:Any] = [
-                "id":"conversation_\(firstMessage.messageId)",
+                "id":conversationID,
                 "other_user_email":otherEmail,
                 "latest_message":[
                     "date":dateString,
@@ -173,12 +174,14 @@ extension DatabaseManager {
             if var converstaions = userNode["conversations"] as? [[String:Any]] {
                 converstaions.append(newConversationData)
                 userNode["converstaions"] = converstaions
-                ref.setValue(userNode) { error, _ in
+                ref.setValue(userNode) {[weak self] error, _ in
                     guard error == nil else {
                         completion(false)
                         return
                     }
-                    completion(true)
+                    self?.finishCreatingConverstaion(conversationID: conversationID,
+                                                    firstMessage: firstMessage,
+                                                    compeltion: completion)
                 }
                 
             }else {
@@ -187,12 +190,14 @@ extension DatabaseManager {
                     newConversationData
                 ]
                 
-                ref.setValue(userNode) { error, _ in
+                ref.setValue(userNode) {[weak self] error, _ in
                     guard error == nil else {
                         completion(false)
                         return
                     }
-                    completion(true)
+                    self?.finishCreatingConverstaion(conversationID: conversationID,
+                                                    firstMessage: firstMessage,
+                                                    compeltion: completion)
                 }
                 
             }
@@ -202,6 +207,70 @@ extension DatabaseManager {
         
     }
     
+    
+    private func finishCreatingConverstaion(conversationID:String, firstMessage:Message, compeltion:@escaping (Bool) -> Void) {
+        
+        var message = ""
+        switch firstMessage.kind {
+           case .text(let messageText):
+               message = messageText
+               break
+           case .attributedText(_):
+               break
+           case .photo(_):
+               break
+           case .video(_):
+               break
+           case .location(_):
+               break
+           case .emoji(_):
+               break
+           case .audio(_):
+               break
+           case .contact(_):
+               break
+           case .linkPreview(_):
+               break
+           case .custom(_):
+               break
+        }
+        
+        let messageDate = firstMessage.sentDate
+        let dateString = ChatViewController.dateformatter.string(from: messageDate)
+        
+        guard let myEmail = UserDefaults.standard.value(forKey: "email") as? String else {
+            compeltion(false)
+            return
+        }
+        
+        let currentUserEmail = DatabaseManager.safeEmail(emailAddress: myEmail)
+        
+        let collectionMessage:[String:Any] = [
+            "id":firstMessage.messageId,
+            "type":firstMessage.kind.messageKindString,
+            "content":message,
+            "date":dateString,
+            "sender_email":currentUserEmail,
+            "is_read":false
+
+        ]
+        
+        let value:[String:Any] = [
+            "messages":[
+                collectionMessage
+            ]
+        ]
+        
+        database.child("\(conversationID)").setValue(value) { error, _ in
+            guard error == nil else {
+                compeltion(false)
+                return
+            }
+            
+            compeltion(true)
+        }
+        
+    }
     
     /// fetch and return all conversation for the user passed the email
     public func getAllConversations(for email:String, completions:@escaping (Result<String,Error>) -> Void) {
